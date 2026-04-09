@@ -277,5 +277,82 @@ def discover(pool, concept, industry, list_concepts, list_industries,
             click.echo(f"  图表已保存: {chart_path}")
 
 
+@cli.command()
+@click.argument("symbols", nargs=-1)
+@click.option("--pool", type=click.Choice(["sz50", "hs300", "zz500", "cyb"]),
+              default=None, help="预置股票池 (sz50/hs300/zz500/cyb)")
+@click.option("--start", required=True, help="开始日期 (YYYY-MM-DD)")
+@click.option("--end", required=True, help="结束日期 (YYYY-MM-DD)")
+@click.option("--random-n", default=1000, type=int,
+              help="随机策略模拟次数 (默认: 1000)")
+@click.option("--no-chart", is_flag=True, default=False,
+              help="不生成对比图表")
+def backtest(symbols, pool, start, end, random_n, no_chart):
+    """回测验证 - 检验技术指标的实际选股效果。
+
+    \b
+    对比信号策略 vs 随机买入的胜率和收益率。
+    测试4种卖出规则: 持仓5天/10天/20天 + 止盈10%止损5%。
+
+    \b
+    示例:
+      stock backtest --pool cyb --start 2024-04-08 --end 2026-04-08
+      stock backtest --pool sz50 --start 2024-04-08 --end 2026-04-08
+      stock backtest 300677.SZ 300750.SZ --start 2025-01-01 --end 2026-04-08
+    """
+    from stock_cli.backtester import (
+        run_backtest, format_backtest_report,
+        export_backtest_excel, plot_backtest_comparison,
+    )
+    from stock_cli.pool_provider import BUILTIN_POOLS, get_pool_by_index
+
+    all_symbols = list(symbols)
+    pool_name = "自选股票"
+
+    if pool:
+        pool_info = BUILTIN_POOLS[pool]
+        pool_name = pool_info["name"]
+        click.echo(f"正在获取 {pool_name} 成分股 ...")
+        all_symbols.extend(get_pool_by_index(pool_info["index_code"], pool_key=pool))
+
+    if not all_symbols:
+        click.echo("错误: 请提供股票代码或 --pool", err=True)
+        raise SystemExit(1)
+
+    # 去重
+    seen = set()
+    unique = []
+    for s in all_symbols:
+        if s not in seen:
+            seen.add(s)
+            unique.append(s)
+
+    click.echo(f"开始回测: {pool_name} {len(unique)} 只股票 ({start} ~ {end})")
+    click.echo(f"随机基准模拟次数: {random_n}\n")
+
+    def on_progress(idx, total, symbol, phase):
+        click.echo(f"  [{phase}] [{idx}/{total}] {symbol}")
+
+    report = run_backtest(unique, start, end, pool_name=pool_name,
+                           random_n=random_n, on_progress=on_progress)
+
+    # 打印报告
+    click.echo()
+    click.echo(format_backtest_report(report))
+
+    # 导出 Excel
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    safe_pool = (pool or "custom").replace(" ", "_")
+    xlsx_path = os.path.join(OUTPUT_DIR, f"backtest_{safe_pool}_{start}_{end}.xlsx")
+    export_backtest_excel(report, xlsx_path)
+    click.echo(f"\nExcel 报告已保存: {xlsx_path}")
+
+    # 对比图表
+    if not no_chart:
+        chart_path = os.path.join(OUTPUT_DIR, f"backtest_{safe_pool}_{start}_{end}.png")
+        plot_backtest_comparison(report, chart_path)
+        click.echo(f"对比图表已保存: {chart_path}")
+
+
 if __name__ == "__main__":
     cli()

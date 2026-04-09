@@ -1,6 +1,6 @@
 # Stock CLI - 股票数据分析工具
 
-命令行股票分析工具，支持 A股、港股、美股、日股等市场。提供数据查询、技术面筛选、自动发现潜力股三大功能。
+命令行股票分析工具，支持 A股、港股、美股、日股等市场。提供数据查询、技术面筛选、自动发现潜力股、回测验证四大功能。
 
 ## 功能概览
 
@@ -9,13 +9,58 @@
 | `stock query` | 数据查询 | 获取单只股票数据，生成K线图和Excel |
 | `stock screen` | 技术筛选 | 对指定股票进行8项技术指标评分排名 |
 | `stock discover` | 自动发现 | 从指数/板块中自动获取股票池并筛选潜力股 |
+| `stock backtest` | 回测验证 | 检验技术指标的实际选股效果，对比随机买入 |
 
-## 安装
+## 环境搭建
+
+### 1. 创建 conda 虚拟环境
 
 ```bash
+# 创建 Python 3.11 的虚拟环境
+conda create -n stock_cli python=3.11 -y
+
+# 激活环境
 conda activate stock_cli
-pip install -e .
 ```
+
+### 2. 安装依赖包
+
+```bash
+# 方式一：通过 pip install -e . 一键安装（推荐）
+pip install -e .
+
+# 方式二：手动安装各依赖
+pip install yfinance>=0.2.0      # Yahoo Finance 股票数据
+pip install akshare>=1.10.0      # A股指数成分/行业板块数据
+pip install pandas>=1.4.0        # 数据处理
+pip install matplotlib>=3.5.0    # 图表绘制
+pip install click>=8.0.0         # CLI 命令行框架
+pip install openpyxl>=3.0.0      # Excel 导出
+```
+
+### 3. 验证安装
+
+```bash
+# 确保在 stock_cli 环境中
+conda activate stock_cli
+
+# 查看帮助
+stock --help
+
+# 快速测试：查询苹果近一个月数据
+stock query AAPL --start 2026-03-01 --end 2026-04-09
+```
+
+### 依赖说明
+
+| 包名 | 用途 | 说明 |
+|------|------|------|
+| yfinance | 股票数据获取 | 支持全球市场 (A股/港股/美股/日股) |
+| akshare | A股板块数据 | 获取指数成分股、行业/概念板块 |
+| pandas | 数据处理 | DataFrame 操作、时间序列处理 |
+| matplotlib | 图表绘制 | K线图、技术分析三子图、回测对比图 |
+| click | CLI 框架 | 命令行参数解析、子命令管理 |
+| openpyxl | Excel 导出 | 生成 .xlsx 筛选报告和回测报告 |
 
 ## 股票代码格式
 
@@ -327,11 +372,20 @@ stock_cli/
 output/                # 所有输出文件 (图表/Excel)
 ```
 
-## 依赖
+## 常见问题
 
-- yfinance - Yahoo Finance 数据
-- akshare - A股指数成分/板块数据
-- pandas - 数据处理
-- matplotlib - 图表绘制
-- click - CLI 框架
-- openpyxl - Excel 导出
+### 1. `stock` 命令不存在？
+确保已激活 conda 环境并执行了 `pip install -e .`：
+```bash
+conda activate stock_cli
+pip install -e .
+```
+
+### 2. 图表中文显示为方框？
+程序已自动配置中文字体（macOS: Heiti TC，其他系统会按 Hiragino Sans GB / Arial Unicode MS / SimHei 顺序回退）。如仍有问题，请安装中文字体。
+
+### 3. akshare 获取板块数据失败？
+东方财富部分接口可能因网络问题失败，程序会自动回退到内置静态股票池文件 (`stock_cli/data/*.txt`)。预置的 sz50/hs300/zz500/cyb 不受影响。
+
+### 4. yfinance 获取 A 股数据慢/失败？
+A股代码必须带后缀：`.SS` (上证) 或 `.SZ` (深证)。如 `600519.SS`。网络不通时可考虑配置代理。
