@@ -26,17 +26,18 @@ def format_terminal_table(results: List[ScreenResult]) -> str:
     failed = [r for r in results if r.error is not None]
 
     lines = []
-    lines.append("=" * 72)
-    lines.append(f"  {'排名':<6} {'代码':<14} {'得分':<10} {'触发信号'}")
-    lines.append("-" * 72)
+    lines.append("=" * 88)
+    lines.append(f"  {'排名':<6} {'代码':<14} {'当前价格':<12} {'得分':<10} {'触发信号'}")
+    lines.append("-" * 88)
 
     for rank, r in enumerate(valid, 1):
         triggered = [s.label for s in r.signals if s.triggered]
         sig_str = ", ".join(triggered) if triggered else "-"
         score_str = f"{r.total_score}/{r.max_possible}"
-        lines.append(f"  {str(rank):<6} {r.symbol:<14} {score_str:<10} {sig_str}")
+        price_str = f"{r.current_price:.2f}" if r.current_price is not None else "N/A"
+        lines.append(f"  {str(rank):<6} {r.symbol:<14} {price_str:<12} {score_str:<10} {sig_str}")
 
-    lines.append("=" * 72)
+    lines.append("=" * 88)
 
     if failed:
         lines.append("")
@@ -54,7 +55,7 @@ def export_screen_excel(results: List[ScreenResult], output_path: str):
     # Sheet 1: 筛选排名
     ranking_rows = []
     for rank, r in enumerate(valid, 1):
-        row = {"排名": rank, "代码": r.symbol, "总分": r.total_score}
+        row = {"排名": rank, "代码": r.symbol, "当前价格": r.current_price, "总分": r.total_score}
         for s in r.signals:
             row[s.label] = s.score
         ranking_rows.append(row)
@@ -66,6 +67,7 @@ def export_screen_excel(results: List[ScreenResult], output_path: str):
         for s in r.signals:
             detail_rows.append({
                 "代码": r.symbol,
+                "当前价格": r.current_price,
                 "信号": s.label,
                 "是否触发": "是" if s.triggered else "否",
                 "得分": s.score,

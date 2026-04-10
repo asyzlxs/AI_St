@@ -32,6 +32,7 @@ class ScreenResult:
     total_score: int
     max_possible: int
     signals: List[SignalResult]
+    current_price: Optional[float] = None
     df: Optional[pd.DataFrame] = None
     indicators: Dict[str, pd.Series] = field(default_factory=dict)
     error: Optional[str] = None
@@ -134,7 +135,7 @@ def analyze_stock(symbol: str, df: pd.DataFrame) -> ScreenResult:
 
     return ScreenResult(
         symbol=symbol, total_score=total_score, max_possible=MAX_POSSIBLE,
-        signals=signals, df=df, indicators=indicators,
+        signals=signals, df=df, indicators=indicators, current_price=last_close,
     )
 
 
