@@ -125,8 +125,11 @@ def screen(symbols, watchlist_file, start, end, min_score, no_chart):
 
 
 @cli.command()
-@click.option("--pool", type=click.Choice(["sz50", "hs300", "zz500", "cyb"]),
-              default=None, help="预置股票池 (sz50/hs300/zz500/cyb)")
+@click.option("--pool", type=click.Choice([
+    "sz50", "hs300", "zz500", "cyb",           # 指数池
+    "hgt", "sgt",                               # 沪深股通
+    "newenergy", "chip", "tech", "ai", "ev"    # 热门概念
+]), default=None, help="预置股票池")
 @click.option("--concept", default=None, help="概念板块名称 (如: 半导体, ChatGPT)")
 @click.option("--industry", default=None, help="行业板块名称 (如: 银行, 新能源)")
 @click.option("--list-concepts", is_flag=True, default=False,
@@ -147,20 +150,28 @@ def discover(pool, concept, industry, list_concepts, list_industries,
 
     \b
     预置股票池:
-      sz50   - 上证50
-      hs300  - 沪深300
-      zz500  - 中证500
-      cyb    - 创业板指
+      【指数池】
+      sz50   - 上证50       hs300  - 沪深300
+      zz500  - 中证500      cyb    - 创业板指
+
+      【互联互通】
+      hgt    - 沪股通       sgt    - 深股通
+
+      【热门概念】
+      newenergy - 新能源    chip   - 芯片
+      tech      - 科技创新  ai     - 人工智能
+      ev        - 新能源车
 
     \b
     示例:
-      stock discover --pool sz50 --start 2025-07-01 --end 2026-04-08
+      stock discover --pool hgt --start 2025-07-01 --end 2026-04-08
+      stock discover --pool chip --start 2025-07-01 --end 2026-04-08 --top 15
       stock discover --concept 半导体 --start 2025-07-01 --end 2026-04-08
       stock discover --industry 新能源 --start 2025-07-01 --end 2026-04-08 --top 5
       stock discover --list-concepts
     """
     from stock_cli.pool_provider import (
-        BUILTIN_POOLS, get_pool_by_index, get_pool_by_concept,
+        BUILTIN_POOLS, get_pool, get_pool_by_concept,
         get_pool_by_industry, list_concepts as _list_concepts,
         list_industries as _list_industries,
     )
@@ -211,7 +222,7 @@ def discover(pool, concept, industry, list_concepts, list_industries,
         pool_info = BUILTIN_POOLS[pool]
         source_name = pool_info["name"]
         click.echo(f"正在获取 {source_name} 成分股 ...")
-        symbols = get_pool_by_index(pool_info["index_code"], pool_key=pool)
+        symbols = get_pool(pool)
 
     if concept:
         source_name = f"概念: {concept}"
@@ -279,8 +290,11 @@ def discover(pool, concept, industry, list_concepts, list_industries,
 
 @cli.command()
 @click.argument("symbols", nargs=-1)
-@click.option("--pool", type=click.Choice(["sz50", "hs300", "zz500", "cyb"]),
-              default=None, help="预置股票池 (sz50/hs300/zz500/cyb)")
+@click.option("--pool", type=click.Choice([
+    "sz50", "hs300", "zz500", "cyb",           # 指数池
+    "hgt", "sgt",                               # 沪深股通
+    "newenergy", "chip", "tech", "ai", "ev"    # 热门概念
+]), default=None, help="预置股票池")
 @click.option("--start", required=True, help="开始日期 (YYYY-MM-DD)")
 @click.option("--end", required=True, help="结束日期 (YYYY-MM-DD)")
 @click.option("--random-n", default=1000, type=int,
@@ -297,14 +311,14 @@ def backtest(symbols, pool, start, end, random_n, no_chart):
     \b
     示例:
       stock backtest --pool cyb --start 2024-04-08 --end 2026-04-08
-      stock backtest --pool sz50 --start 2024-04-08 --end 2026-04-08
+      stock backtest --pool chip --start 2024-04-08 --end 2026-04-08
       stock backtest 300677.SZ 300750.SZ --start 2025-01-01 --end 2026-04-08
     """
     from stock_cli.backtester import (
         run_backtest, format_backtest_report,
         export_backtest_excel, plot_backtest_comparison,
     )
-    from stock_cli.pool_provider import BUILTIN_POOLS, get_pool_by_index
+    from stock_cli.pool_provider import BUILTIN_POOLS, get_pool
 
     all_symbols = list(symbols)
     pool_name = "自选股票"
@@ -313,7 +327,7 @@ def backtest(symbols, pool, start, end, random_n, no_chart):
         pool_info = BUILTIN_POOLS[pool]
         pool_name = pool_info["name"]
         click.echo(f"正在获取 {pool_name} 成分股 ...")
-        all_symbols.extend(get_pool_by_index(pool_info["index_code"], pool_key=pool))
+        all_symbols.extend(get_pool(pool))
 
     if not all_symbols:
         click.echo("错误: 请提供股票代码或 --pool", err=True)

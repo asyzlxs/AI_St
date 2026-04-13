@@ -2,6 +2,8 @@
 
 命令行股票分析工具，支持 A股、港股、美股、日股等市场。提供数据查询、技术面筛选、自动发现潜力股、回测验证四大功能。
 
+> 🚀 **快速开始**: 查看 [QUICKSTART.md](QUICKSTART.md) | 📖 **脚本指南**: [SCRIPTS.md](SCRIPTS.md) | 📊 **股票池说明**: [POOLS.md](POOLS.md)
+
 ## 功能概览
 
 | 命令 | 功能 | 说明 |
@@ -10,6 +12,36 @@
 | `stock screen` | 技术筛选 | 对指定股票进行8项技术指标评分排名 |
 | `stock discover` | 自动发现 | 从指数/板块中自动获取股票池并筛选潜力股 |
 | `stock backtest` | 回测验证 | 检验技术指标的实际选股效果，对比随机买入 |
+
+## 快速开始
+
+### 一键自动化分析（推荐）
+
+```bash
+# 1. 激活环境
+conda activate stock_cli
+
+# 2. 分析沪股通潜力股（默认）
+./daily_pool_analysis.sh
+
+# 3. 或分析其他板块
+./daily_pool_analysis.sh chip         # 芯片板块
+./daily_pool_analysis.sh newenergy    # 新能源板块
+./daily_pool_analysis.sh cyb          # 创业板
+```
+
+### 手动命令使用
+
+```bash
+# 发现沪股通潜力股
+stock discover --pool hgt --start 2025-07-01 --end 2026-04-13
+
+# 筛选自选股
+stock screen 600519.SS 300750.SZ --start 2025-07-01 --end 2026-04-13
+
+# 查询单只股票
+stock query AAPL --start 2025-01-01 --end 2026-04-13
+```
 
 ## 环境搭建
 
@@ -210,6 +242,8 @@ output/
 
 ### 预置股票池
 
+**指数池**
+
 | 参数 | 股票池 | 成分股数量 |
 |------|--------|-----------|
 | `--pool sz50` | 上证 50 | 50 只 |
@@ -217,11 +251,28 @@ output/
 | `--pool zz500` | 中证 500 | 500 只 |
 | `--pool cyb` | 创业板指 | 100 只 |
 
+**互联互通（北向资金）**
+
+| 参数 | 股票池 | 说明 |
+|------|--------|------|
+| `--pool hgt` | 沪股通 | 港股通可买入的上海股票 |
+| `--pool sgt` | 深股通 | 港股通可买入的深圳股票 |
+
+**热门概念板块**
+
+| 参数 | 股票池 | 说明 |
+|------|--------|------|
+| `--pool newenergy` | 新能源 | 光伏、风电、储能等 |
+| `--pool chip` | 芯片 | 半导体设计、制造、封测 |
+| `--pool tech` | 科技创新 | 科技创新相关 |
+| `--pool ai` | 人工智能 | AI算法、算力、应用 |
+| `--pool ev` | 新能源车 | 整车、电池、零部件 |
+
 ### 全部选项
 
 | 选项 | 说明 | 默认值 |
 |------|------|--------|
-| `--pool` | 预置股票池 (sz50/hs300/zz500/cyb) | - |
+| `--pool` | 预置股票池 (sz50/hs300/zz500/cyb/hgt/sgt/newenergy/chip/tech/ai/ev) | - |
 | `--concept` | 概念板块名称 (如: 半导体) | - |
 | `--industry` | 行业板块名称 (如: 新能源) | - |
 | `--list-concepts` | 列出所有可用概念板块 | - |
@@ -248,6 +299,28 @@ stock discover --pool hs300 --start 2025-07-01 --end 2026-04-08 --min-score 30 -
 
 # 中证 500，不生成图表（大池子建议加 --no-chart 加速）
 stock discover --pool zz500 --start 2025-07-01 --end 2026-04-08 --no-chart
+
+# === 从北向资金中发现（沪深股通） ===
+
+# 沪股通潜力股
+stock discover --pool hgt --start 2025-07-01 --end 2026-04-08 --top 15
+
+# 深股通潜力股
+stock discover --pool sgt --start 2025-07-01 --end 2026-04-08 --top 15
+
+# === 从热门概念板块中发现 ===
+
+# 芯片板块
+stock discover --pool chip --start 2025-07-01 --end 2026-04-08 --top 20
+
+# 新能源板块，得分 >= 30
+stock discover --pool newenergy --start 2025-07-01 --end 2026-04-08 --min-score 30
+
+# 人工智能板块
+stock discover --pool ai --start 2025-07-01 --end 2026-04-08
+
+# 新能源车板块
+stock discover --pool ev --start 2025-07-01 --end 2026-04-08 --top 15
 
 # === 从行业/概念板块中发现（需要东方财富网络可达）===
 
@@ -298,6 +371,94 @@ output/
   300255_SZ_2025-07-01_2026-04-08_discover.png
   ...
 ```
+
+---
+
+## 四、自动化分析脚本
+
+为了方便每日定时分析，项目提供了开箱即用的自动化脚本。
+
+> 📖 **详细说明请查看**: [SCRIPTS.md](SCRIPTS.md)
+
+### daily_pool_analysis.sh - 股票池每日分析 ⭐推荐
+
+自动分析指定股票池的潜力股 + 自选股，一键生成完整报告。
+
+#### 基本用法
+
+```bash
+./daily_pool_analysis.sh [POOL]
+```
+
+#### 支持的股票池
+
+| 类别 | 股票池代码 | 说明 |
+|------|-----------|------|
+| **指数池** | sz50, hs300, zz500, cyb | 上证50/沪深300/中证500/创业板指 |
+| **互联互通** | hgt, sgt | 沪股通/深股通（北向资金） |
+| **热门概念** | newenergy, chip, tech, ai, ev | 新能源/芯片/科技/AI/新能源车 |
+
+#### 使用示例
+
+```bash
+# 默认分析沪股通（hgt）
+./daily_pool_analysis.sh
+
+# 分析芯片板块
+./daily_pool_analysis.sh chip
+
+# 分析新能源板块
+./daily_pool_analysis.sh newenergy
+
+# 分析创业板
+./daily_pool_analysis.sh cyb
+
+# 分析沪深300
+./daily_pool_analysis.sh hs300
+```
+
+#### 脚本功能
+
+1. **潜力股发现** - 从指定股票池筛选 Top 20（得分 >= 15）
+2. **自选股分析** - 分析 `watchlist.txt` 中的股票（如果存在）
+3. **生成报告** - 输出 Excel 表格和技术分析图表
+
+#### 配置说明
+
+脚本内可调参数（编辑脚本修改）：
+
+```bash
+MIN_SCORE=15          # 最低分数阈值
+TOP_N=20              # 显示前 N 名
+START_DATE=...        # 默认最近1年数据
+```
+
+#### 输出文件
+
+```
+output/
+  discover_<pool>_<日期>.xlsx       # 股票池筛选结果
+  screen_<日期>.xlsx                # 自选股分析结果
+  *_discover.png                    # 潜力股技术分析图表
+  *_screen.png                      # 自选股技术分析图表
+```
+
+#### 定时任务设置
+
+可使用 cron 设置每日自动执行（例如每天晚上9点）：
+
+```bash
+# 编辑 crontab
+crontab -e
+
+# 添加定时任务
+0 21 * * 1-5 cd /path/to/AI_St && ./daily_pool_analysis.sh chip >> logs/daily_chip.log 2>&1
+```
+
+### 其他自动化脚本
+
+- **daily_analysis.sh** - 创业板分析（固定池）
+- **daily_analysis_watchlist.sh** - 仅自选股分析
 
 ---
 
