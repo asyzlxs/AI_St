@@ -4,7 +4,7 @@ from typing import List, Dict, Optional, Callable
 
 import pandas as pd
 
-from stock_cli.fetcher import fetch_stock_data
+from stock_cli.fetcher import fetch_stock_data, fetch_stock_name
 from stock_cli.indicators import (
     moving_averages, detect_golden_cross, detect_bullish_alignment,
     compute_rsi, detect_rsi_oversold_bounce,
@@ -32,6 +32,7 @@ class ScreenResult:
     total_score: int
     max_possible: int
     signals: List[SignalResult]
+    name: Optional[str] = None
     current_price: Optional[float] = None
     df: Optional[pd.DataFrame] = None
     indicators: Dict[str, pd.Series] = field(default_factory=dict)
@@ -54,12 +55,12 @@ MAX_POSSIBLE = sum(s["max_score"] for s in SIGNAL_CONFIG)
 MIN_DATA_ROWS = 60
 
 
-def analyze_stock(symbol: str, df: pd.DataFrame) -> ScreenResult:
+def analyze_stock(symbol: str, df: pd.DataFrame, name: Optional[str] = None) -> ScreenResult:
     """对单只股票执行全部技术指标分析并评分。"""
     if len(df) < MIN_DATA_ROWS:
         return ScreenResult(
             symbol=symbol, total_score=0, max_possible=MAX_POSSIBLE,
-            signals=[], df=df, error=f"数据不足 ({len(df)} 行, 需要 >= {MIN_DATA_ROWS})"
+            signals=[], df=df, name=name, error=f"数据不足 ({len(df)} 行, 需要 >= {MIN_DATA_ROWS})"
         )
 
     # 计算指标
@@ -124,18 +125,19 @@ def analyze_stock(symbol: str, df: pd.DataFrame) -> ScreenResult:
     signals = []
     total_score = 0
     for cfg in SIGNAL_CONFIG:
-        name = cfg["name"]
-        triggered, detail = detections[name]
+        signal_name = cfg["name"]
+        triggered, detail = detections[signal_name]
         score = cfg["max_score"] if triggered else 0
         total_score += score
         signals.append(SignalResult(
-            name=name, label=cfg["label"], triggered=triggered,
+            name=signal_name, label=cfg["label"], triggered=triggered,
             score=score, max_score=cfg["max_score"], detail=detail,
         ))
 
     return ScreenResult(
         symbol=symbol, total_score=total_score, max_possible=MAX_POSSIBLE,
         signals=signals, df=df, indicators=indicators, current_price=last_close,
+        name=name,
     )
 
 
@@ -149,8 +151,10 @@ def screen_stocks(symbols: List[str], start: str, end: str,
         if on_progress:
             on_progress(idx, total, symbol)
         try:
+            # 获取股票名称和数据
+            name = fetch_stock_name(symbol)
             df = fetch_stock_data(symbol, start, end)
-            result = analyze_stock(symbol, df)
+            result = analyze_stock(symbol, df, name)
         except Exception as e:
             result = ScreenResult(
                 symbol=symbol, total_score=0, max_possible=MAX_POSSIBLE,

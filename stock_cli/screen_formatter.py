@@ -26,18 +26,31 @@ def format_terminal_table(results: List[ScreenResult]) -> str:
     failed = [r for r in results if r.error is not None]
 
     lines = []
-    lines.append("=" * 88)
-    lines.append(f"  {'排名':<6} {'代码':<14} {'当前价格':<12} {'得分':<10} {'触发信号'}")
-    lines.append("-" * 88)
+    lines.append("=" * 120)
+    lines.append(f"  {'名字':<24} {'排名':<6} {'代码':<14} {'当前价格':<12} {'得分':<10} {'触发信号'}")
+    lines.append("-" * 120)
 
     for rank, r in enumerate(valid, 1):
         triggered = [s.label for s in r.signals if s.triggered]
         sig_str = ", ".join(triggered) if triggered else "-"
         score_str = f"{r.total_score}/{r.max_possible}"
         price_str = f"{r.current_price:.2f}" if r.current_price is not None else "N/A"
-        lines.append(f"  {str(rank):<6} {r.symbol:<14} {price_str:<12} {score_str:<10} {sig_str}")
+        # 处理中文名称显示：如果名称显示宽度超过24，截断并添加省略号
+        name_str = r.name or '-'
+        if _display_width(name_str) > 24:
+            # 逐字符截断直到宽度合适
+            truncated = ''
+            for ch in name_str:
+                if _display_width(truncated + ch + '..') <= 24:
+                    truncated += ch
+                else:
+                    break
+            name_str = truncated + '..'
+        # 填充到24宽度
+        name_str = _pad(name_str, 24)
+        lines.append(f"  {name_str} {str(rank):<6} {r.symbol:<14} {price_str:<12} {score_str:<10} {sig_str}")
 
-    lines.append("=" * 88)
+    lines.append("=" * 120)
 
     if failed:
         lines.append("")
@@ -54,18 +67,38 @@ def export_screen_excel(results: List[ScreenResult], output_path: str):
 
     # Sheet 1: 筛选排名
     ranking_rows = []
+    # 定义固定的列顺序
+    base_columns = ["名字", "排名", "代码", "当前价格", "总分"]
+    signal_labels = [s["label"] for s in SIGNAL_CONFIG]
+    all_columns = base_columns + signal_labels
+
     for rank, r in enumerate(valid, 1):
-        row = {"排名": rank, "代码": r.symbol, "当前价格": r.current_price, "总分": r.total_score}
-        for s in r.signals:
-            row[s.label] = s.score
+        # 按照 all_columns 的顺序构建每一行，使用列表而不是字典
+        row = []
+        # 添加基础列
+        row.append(r.name or '-')  # 名字
+        row.append(rank)  # 排名
+        row.append(r.symbol)  # 代码
+        row.append(r.current_price)  # 当前价格
+        row.append(r.total_score)  # 总分
+
+        # 按照 SIGNAL_CONFIG 的顺序添加各个信号的��分
+        signal_scores = {s.name: s.score for s in r.signals}
+        for cfg in SIGNAL_CONFIG:
+            row.append(signal_scores.get(cfg["name"], 0))
+
         ranking_rows.append(row)
-    df_ranking = pd.DataFrame(ranking_rows)
+
+    df_ranking = pd.DataFrame(ranking_rows, columns=all_columns)
 
     # Sheet 2: 信号详情
     detail_rows = []
+    detail_columns = ["名字", "代码", "当前价格", "信号", "是否触发", "得分", "满分", "详情"]
+
     for r in valid:
         for s in r.signals:
             detail_rows.append({
+                "名字": r.name or '-',
                 "代码": r.symbol,
                 "当前价格": r.current_price,
                 "信号": s.label,
@@ -74,7 +107,7 @@ def export_screen_excel(results: List[ScreenResult], output_path: str):
                 "满分": s.max_score,
                 "详情": s.detail,
             })
-    df_detail = pd.DataFrame(detail_rows)
+    df_detail = pd.DataFrame(detail_rows, columns=detail_columns)
 
     with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
         if not df_ranking.empty:
