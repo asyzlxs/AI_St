@@ -1,3 +1,5 @@
+import os
+import json
 import yfinance as yf
 import pandas as pd
 import akshare as ak
@@ -7,9 +9,20 @@ _a_stock_name_cache = None
 
 
 def _get_a_stock_name_cache():
-    """获取 A 股代码-名称映射表（缓存）。"""
+    """获取 A 股代码-名称映射表（优先从本地缓存文件读取，失败则在线获取）。"""
     global _a_stock_name_cache
     if _a_stock_name_cache is None:
+        # 1. 尝试从本地 JSON 文件读取（无需外网 VPN）
+        cache_file = os.path.join(os.path.dirname(__file__), "data", "a_stock_names.json")
+        if os.path.exists(cache_file):
+            try:
+                with open(cache_file, "r", encoding="utf-8") as f:
+                    _a_stock_name_cache = json.load(f)
+                return _a_stock_name_cache
+            except Exception:
+                pass
+                
+        # 2. 如果本地读取失败或文件不存在，退回到在线获取
         try:
             # 获取沪深京所有股票的代码和名称
             df = ak.stock_info_a_code_name()
