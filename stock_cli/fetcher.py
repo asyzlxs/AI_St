@@ -72,6 +72,30 @@ def fetch_stock_data(symbol: str, start: str, end: str) -> pd.DataFrame:
     Returns:
         包含 OHLCV 数据的 DataFrame
     """
+    # 尝试使用 akshare 获取 A 股数据（数据更新更及时，包含当天收盘数据，且 end 日期是包含的）
+    if symbol.endswith('.SS') or symbol.endswith('.SZ'):
+        code = symbol.split('.')[0]
+        start_date = start.replace('-', '')
+        end_date = end.replace('-', '')
+        try:
+            df = ak.stock_zh_a_hist(symbol=code, period="daily", start_date=start_date, end_date=end_date, adjust="qfq")
+            if not df.empty:
+                df = df.rename(columns={
+                    "日期": "Date",
+                    "开盘": "Open",
+                    "收盘": "Close",
+                    "最高": "High",
+                    "最低": "Low",
+                    "成交量": "Volume"
+                })
+                df["Adj Close"] = df["Close"]
+                df["Date"] = pd.to_datetime(df["Date"])
+                df.set_index("Date", inplace=True)
+                return df
+        except Exception:
+            pass  # 如果 akshare 失败，回退到 yfinance 获取
+
+    # 默认使用 yfinance 获取数据
     ticker = yf.Ticker(symbol)
     df = ticker.history(start=start, end=end)
 
