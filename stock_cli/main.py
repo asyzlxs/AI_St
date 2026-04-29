@@ -368,5 +368,60 @@ def backtest(symbols, pool, start, end, random_n, no_chart):
         click.echo(f"对比图表已保存: {chart_path}")
 
 
+@cli.command()
+@click.argument("symbols", nargs=-1)
+@click.option("--pool", type=click.Choice([
+    "sz50", "hs300", "zz500", "cyb",           # 指数池
+    "hgt", "sgt",                               # 沪深股通
+    "newenergy", "chip", "tech", "ai", "ev"    # 热门概念
+]), default=None, help="预置股票池")
+@click.option("--start", default="2025-01-01", help="开始日期 (默认: 2025-01-01)")
+@click.option("--end", default=None, help="结束日期 (默认: 今天)")
+def update_cache(symbols, pool, start, end):
+    """手动更新股票或股票池的本地缓存。
+
+    SYMBOLS: 一个或多个股票代码，如 600001.SS
+    
+    示例:
+      stock update-cache 600001.SS
+      stock update-cache --pool cyb
+    """
+    from datetime import datetime
+    from stock_cli.pool_provider import BUILTIN_POOLS, get_pool
+    
+    if not end:
+        end = datetime.now().strftime("%Y-%m-%d")
+
+    all_symbols = list(symbols)
+    pool_name = "指定股票"
+
+    if pool:
+        pool_info = BUILTIN_POOLS[pool]
+        pool_name = pool_info["name"]
+        click.echo(f"正在获取 {pool_name} 成分股 ...")
+        all_symbols.extend(get_pool(pool))
+
+    if not all_symbols:
+        click.echo("错误: 请提供至少一个股票代码或使用 --pool", err=True)
+        raise SystemExit(1)
+
+    # 去重
+    unique_symbols = list(dict.fromkeys(all_symbols))
+    
+    click.echo(f"开始更新缓存: {pool_name} 共 {len(unique_symbols)} 只股票 ({start} ~ {end})")
+    
+    success_count = 0
+    for idx, symbol in enumerate(unique_symbols, 1):
+        click.echo(f"  [{idx}/{len(unique_symbols)}] 更新 {symbol} ...")
+        try:
+            # fetch_stock_data 内部已经包含了增量拉取和保存缓存的逻辑
+            fetch_stock_data(symbol, start, end)
+            success_count += 1
+        except Exception as e:
+            click.echo(f"    更新失败: {e}", err=True)
+
+    click.echo(f"\n缓存更新完成! 成功: {success_count}/{len(unique_symbols)}")
+
+
 if __name__ == "__main__":
     cli()
