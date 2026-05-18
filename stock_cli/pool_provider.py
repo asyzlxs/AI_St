@@ -11,9 +11,9 @@ BUILTIN_POOLS = {
     "zz500": {"name": "中证500",  "index_code": "000905"},
     "cyb":   {"name": "创业板指",  "index_code": "399006"},
 
-    # 北向资金/互联互通
-    "hgt":   {"name": "沪股通",   "type": "hk_connect"},
-    "sgt":   {"name": "深股通",   "type": "hk_connect"},
+    # 全市场
+    "hgt":   {"name": "沪市A股",  "type": "exchange_all", "exchange": "sh"},
+    "sgt":   {"name": "深市A股",  "type": "exchange_all", "exchange": "sz"},
 
     # 热门概念板块
     "newenergy": {"name": "新能源",     "type": "concept", "concept_name": "新能源"},
@@ -118,33 +118,36 @@ def list_industries() -> List[str]:
         return []
 
 
-def get_pool_hk_connect(pool_type: str = "sh") -> List[str]:
-    """获取沪股通或深股通成分股（北向资金可交易）。
+def get_pool_exchange_all(exchange: str) -> List[str]:
+    """获取沪市或深市全部 A 股。
 
     Args:
-        pool_type: "sh" for 沪股通, "sz" for 深股通
+        exchange: "sh" 沪市（主板+科创板），"sz" 深市（A股列表）
     """
     try:
         import akshare as ak
-        # 获取沪深股通持股排行（北向资金持有的A股）
-        market_name = "沪股通" if pool_type == "sh" else "深股通"
-        df = ak.stock_hsgt_hold_stock_em(market=market_name, indicator="今日排行")
+        codes: List[str] = []
+        if exchange == "sh":
+            for sub in ("主板A股", "科创板"):
+                df = ak.stock_info_sh_name_code(symbol=sub)
+                codes.extend(str(c) for c in df["证券代码"].tolist())
+        else:
+            df = ak.stock_info_sz_name_code(symbol="A股列表")
+            codes.extend(str(c) for c in df["A股代码"].tolist())
 
-        codes = df["代码"].tolist()
-        symbols = [_to_yfinance_symbol(str(c)) for c in codes]
-
+        symbols = [_to_yfinance_symbol(c) for c in codes]
         if symbols:
-            click.echo(f"  获取到 {len(symbols)} 只{market_name}股票")
+            name = "沪市A股" if exchange == "sh" else "深市A股"
+            click.echo(f"  获取到 {len(symbols)} 只{name}")
             return symbols
     except Exception as e:
-        click.echo(f"  获取{pool_type}股通成分股失败: {e}", err=True)
-        # 尝试使用静态 fallback
-        pool_key = "hgt" if pool_type == "sh" else "sgt"
+        click.echo(f"  获取{exchange}市A股列表失败: {e}", err=True)
+        pool_key = "hgt" if exchange == "sh" else "sgt"
         static = _load_static_fallback(pool_key)
         if static:
             click.echo(f"  使用静态列表 fallback ({len(static)} 只)")
             return static
-        return []
+    return []
 
 
 def get_pool(pool_key: str) -> List[str]:
@@ -158,10 +161,9 @@ def get_pool(pool_key: str) -> List[str]:
     if pool_type == "index":
         # 指数成分股
         return get_pool_by_index(pool_info["index_code"], pool_key=pool_key)
-    elif pool_type == "hk_connect":
-        # 沪股通/深股通
-        connect_type = "sh" if pool_key == "hgt" else "sz"
-        return get_pool_hk_connect(connect_type)
+    elif pool_type == "exchange_all":
+        # 沪市/深市全部 A 股
+        return get_pool_exchange_all(pool_info["exchange"])
     elif pool_type == "concept":
         # 概念板块
         return get_pool_by_concept(pool_info["concept_name"])

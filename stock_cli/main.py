@@ -127,7 +127,7 @@ def screen(symbols, watchlist_file, start, end, min_score, no_chart):
 @cli.command()
 @click.option("--pool", type=click.Choice([
     "sz50", "hs300", "zz500", "cyb",           # 指数池
-    "hgt", "sgt",                               # 沪深股通
+    "hgt", "sgt",                               # 沪深市A股
     "newenergy", "chip", "tech", "ai", "ev"    # 热门概念
 ]), default=None, help="预置股票池")
 @click.option("--concept", default=None, help="概念板块名称 (如: 半导体, ChatGPT)")
@@ -154,8 +154,8 @@ def discover(pool, concept, industry, list_concepts, list_industries,
       sz50   - 上证50       hs300  - 沪深300
       zz500  - 中证500      cyb    - 创业板指
 
-      【互联互通】
-      hgt    - 沪股通       sgt    - 深股通
+      【全市场】
+      hgt    - 沪市A股      sgt    - 深市A股
 
       【热门概念】
       newenergy - 新能源    chip   - 芯片
@@ -292,7 +292,7 @@ def discover(pool, concept, industry, list_concepts, list_industries,
 @click.argument("symbols", nargs=-1)
 @click.option("--pool", type=click.Choice([
     "sz50", "hs300", "zz500", "cyb",           # 指数池
-    "hgt", "sgt",                               # 沪深股通
+    "hgt", "sgt",                               # 沪深市A股
     "newenergy", "chip", "tech", "ai", "ev"    # 热门概念
 ]), default=None, help="预置股票池")
 @click.option("--start", required=True, help="开始日期 (YYYY-MM-DD)")
@@ -372,7 +372,7 @@ def backtest(symbols, pool, start, end, random_n, no_chart):
 @click.argument("symbols", nargs=-1)
 @click.option("--pool", type=click.Choice([
     "sz50", "hs300", "zz500", "cyb",           # 指数池
-    "hgt", "sgt",                               # 沪深股通
+    "hgt", "sgt",                               # 沪深市A股
     "newenergy", "chip", "tech", "ai", "ev"    # 热门概念
 ]), default=None, help="预置股票池")
 @click.option("--start", default="2025-01-01", help="开始日期 (默认: 2025-01-01)")
