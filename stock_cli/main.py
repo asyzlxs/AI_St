@@ -410,12 +410,24 @@ def update_cache(symbols, pool, start, end):
     
     click.echo(f"开始更新缓存: {pool_name} 共 {len(unique_symbols)} 只股票 ({start} ~ {end})")
     
+    from stock_cli.cache import load_cache, save_cache
+    from stock_cli.fetcher import _fetch_from_network
+
     success_count = 0
     for idx, symbol in enumerate(unique_symbols, 1):
         click.echo(f"  [{idx}/{len(unique_symbols)}] 更新 {symbol} ...")
         try:
-            # fetch_stock_data 内部已经包含了增量拉取和保存缓存的逻辑
-            fetch_stock_data(symbol, start, end)
+            cached = load_cache(symbol)
+            fetch_start = start
+            if not cached.empty:
+                cache_end = str(cached.index.max().date())
+                if cache_end >= end:
+                    click.echo(f"    已是最新 ({cache_end})，跳过")
+                    success_count += 1
+                    continue
+                fetch_start = cache_end  # 增量拉取
+            new_data = _fetch_from_network(symbol, fetch_start, end)
+            save_cache(symbol, new_data)
             success_count += 1
         except Exception as e:
             click.echo(f"    更新失败: {e}", err=True)

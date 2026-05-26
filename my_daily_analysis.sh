@@ -19,7 +19,8 @@ PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WATCHLIST="${PROJECT_DIR}/watchlist.txt"
 
 # 时间范围: 最近 250 个交易日 (约 1 年)
-END_DATE=$(date +%Y-%m-%d)
+# 可传入结束日期参数，默认取昨天（缓存数据通常 T+1 才稳定）
+END_DATE="${1:-$(date -v-1d +%Y-%m-%d 2>/dev/null || date -d "yesterday" +%Y-%m-%d)}"
 START_DATE=$(date -v-1y +%Y-%m-%d 2>/dev/null || date -d "1 year ago" +%Y-%m-%d)
 
 # discover 参数

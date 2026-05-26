@@ -99,7 +99,11 @@ def _fetch_from_network(symbol: str, start: str, end: str) -> pd.DataFrame:
 
 
 def fetch_stock_data(symbol: str, start: str, end: str) -> pd.DataFrame:
-    """获取股票历史数据（优先从本地缓存读取，缺失则增量拉取）。
+    """从本地缓存读取股票历史数据，不主动发起网络请求。
+
+    缓存不足（头部/尾部缺失）时只发出 warning，返回现有数据。
+    若本地完全无缓存则抛出 ValueError。
+    运行 `stock update-cache` 可更新缓存。
 
     Args:
         symbol: 股票代码 (如 AAPL, 600519.SS, 7203.T)
@@ -109,51 +113,33 @@ def fetch_stock_data(symbol: str, start: str, end: str) -> pd.DataFrame:
     Returns:
         包含 OHLCV 数据的 DataFrame
     """
-    from stock_cli.cache import load_cache, save_cache
+    from stock_cli.cache import load_cache
     import warnings
 
-    # 最早数据定为 2025-01-01
     MIN_START = "2025-01-01"
     if start < MIN_START:
         start = MIN_START
 
     cached_df = load_cache(symbol)
-    
-    fetch_start = start
-    fetch_end = end
-    need_fetch = False
 
     if cached_df.empty:
-        warnings.warn(f"[{symbol}] 本地无缓存数据，将从网络全量拉取 {fetch_start} 到 {fetch_end}")
-        need_fetch = True
-    else:
-        cache_start = str(cached_df.index.min().date())
-        cache_end = str(cached_df.index.max().date())
+        raise ValueError(
+            f"[{symbol}] 本地无缓存数据，请先运行: stock update-cache {symbol}"
+        )
 
-        # 检查是否缺少尾部（最新）数据
-        if cache_end < end:
-            warnings.warn(f"[{symbol}] 缓存最新至 {cache_end}，目标 {end}，准备增量拉取最新数据")
-            fetch_start = cache_end  # 增量拉取起点为缓存最新日期
-            need_fetch = True
-            
-        # 检查是否缺少头部数据
-        if cache_start > start:
-            warnings.warn(f"[{symbol}] 缓存最早自 {cache_start}，目标 {start}，准备补充拉取早期数据")
-            fetch_start = min(fetch_start, start)
-            need_fetch = True
+    cache_start = str(cached_df.index.min().date())
+    cache_end = str(cached_df.index.max().date())
 
-    if need_fetch:
-        try:
-            new_data = _fetch_from_network(symbol, fetch_start, fetch_end)
-            save_cache(symbol, new_data)
-            cached_df = load_cache(symbol)  # 重新加载合并后的全量缓存
-        except Exception as e:
-            warnings.warn(f"[{symbol}] 网络拉取失败: {e}")
+    if cache_end < end:
+        warnings.warn(
+            f"[{symbol}] 缓存最新至 {cache_end}，请求截止 {end}，"
+            "尾部数据缺失，请运行 stock update-cache 更新缓存"
+        )
 
-    if cached_df.empty:
-        raise ValueError(f"无法获取到 {symbol} 在 {start} ~ {end} 的数据（缓存和网络均失败）")
+    if cache_start > start:
+        warnings.warn(
+            f"[{symbol}] 缓存最早自 {cache_start}，请求起始 {start}，"
+            "头部数据缺失，请运行 stock update-cache 更新缓存"
+        )
 
-    # 截取所需的时间段
-    # 注意：如果 end 比今天晚，切片不会报错，只会返回已有的最新数据
-    sliced_df = cached_df.loc[start:end]
-    return sliced_df
+    return cached_df.loc[start:end]
