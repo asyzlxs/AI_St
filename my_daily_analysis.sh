@@ -9,9 +9,6 @@ set -e
 
 # ===================== 配置区 (按需修改) =====================
 
-# conda 环境名
-CONDA_ENV="stock_cli"
-
 # 项目目录
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
@@ -30,23 +27,19 @@ TOP_N=20              # 显示前 N 名
 
 # ===================== 初始化 ==============================
 
-# 激活 conda
-CONDA_BASE=$(conda info --base 2>/dev/null)
-if [ -z "$CONDA_BASE" ]; then
-    echo "❌ 未找到 conda，请先安装 Anaconda 或 Miniconda"
-    exit 1
-fi
-source "${CONDA_BASE}/etc/profile.d/conda.sh"
-conda activate "${CONDA_ENV}"
-
 echo "============================================================"
 echo "  专属每日股票分析  $(date '+%Y-%m-%d %H:%M')"
-echo "  环境: ${CONDA_ENV} | Python: $(python --version 2>&1 | awk '{print $2}')"
+echo "  Python: $(python --version 2>&1 | awk '{print $2}')"
 echo "  范围: ${START_DATE} ~ ${END_DATE}"
 echo "============================================================"
 echo ""
 
 cd "${PROJECT_DIR}"
+
+if ! command -v stock >/dev/null 2>&1; then
+    echo "❌ 未找到 stock 命令，请先在当前 Python 环境执行：python -m pip install -e ${PROJECT_DIR}"
+    exit 1
+fi
 
 # ===================== Step 1: 各大板块潜力股发现 ==============
 
