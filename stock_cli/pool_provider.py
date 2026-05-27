@@ -1,4 +1,5 @@
 import os
+import json
 from typing import List, Optional
 
 import click
@@ -48,6 +49,18 @@ def _load_static_fallback(pool_key: str) -> Optional[List[str]]:
             if line and not line.startswith("#"):
                 symbols.append(line)
     return symbols if symbols else None
+
+
+def _load_a_stock_codes_fallback() -> List[str]:
+    path = os.path.join(_DATA_DIR, "a_stock_names.json")
+    if not os.path.exists(path):
+        return []
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return list(data.keys())
+    except Exception:
+        return []
 
 
 def get_pool_by_index(index_code: str, pool_key: str = "") -> List[str]:
@@ -132,8 +145,13 @@ def get_pool_exchange_all(exchange: str) -> List[str]:
                 df = ak.stock_info_sh_name_code(symbol=sub)
                 codes.extend(str(c) for c in df["证券代码"].tolist())
         else:
-            df = ak.stock_info_sz_name_code(symbol="A股列表")
-            codes.extend(str(c) for c in df["A股代码"].tolist())
+            try:
+                df = ak.stock_info_sz_name_code(symbol="A股列表")
+                codes.extend(str(c) for c in df["A股代码"].tolist())
+            except Exception as e:
+                click.echo(f"  获取sz市A股列表失败: {e}", err=True)
+                fallback = _load_a_stock_codes_fallback()
+                codes.extend([c for c in fallback if not str(c).startswith("6")])
 
         symbols = [_to_yfinance_symbol(c) for c in codes]
         if symbols:
