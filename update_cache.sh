@@ -38,7 +38,8 @@ run_update_cache() {
   fi
 
   if grep -q "更新失败:" "${tmp}"; then
-    echo "❌ 错误: stock update-cache 存在失败条目（${label}），请查看日志定位具体股票" >&2
+    echo "❌ 错误: stock update-cache 存在失败条目（${label}）" >&2
+    grep "更新失败:" "${tmp}" >&2 || true
     rm -f "${tmp}"
     exit 1
   fi
