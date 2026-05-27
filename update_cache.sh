@@ -14,6 +14,8 @@ if ! command -v stock >/dev/null 2>&1; then
     exit 1
 fi
 
+had_fail=0
+
 run_update_cache() {
   local label="$1"
   shift
@@ -38,10 +40,9 @@ run_update_cache() {
   fi
 
   if grep -q "更新失败:" "${tmp}"; then
-    echo "❌ 错误: stock update-cache 存在失败条目（${label}）" >&2
+    had_fail=1
+    echo "⚠️  警告: stock update-cache 存在失败条目（${label}）" >&2
     grep "更新失败:" "${tmp}" >&2 || true
-    rm -f "${tmp}"
-    exit 1
   fi
 
   rm -f "${tmp}"
@@ -58,4 +59,8 @@ if [ -f "${WATCHLIST}" ]; then
   if [ -n "${symbols}" ]; then
     run_update_cache "自选股" ${symbols}
   fi
+fi
+
+if [ "${had_fail}" -eq 1 ]; then
+  echo "⚠️  提示: 缓存更新存在失败条目（通常为退市/无行情代码），但已继续执行后续步骤" >&2
 fi
