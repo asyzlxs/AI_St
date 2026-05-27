@@ -110,7 +110,5 @@ def export_screen_excel(results: List[ScreenResult], output_path: str):
     df_detail = pd.DataFrame(detail_rows, columns=detail_columns)
 
     with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
-        if not df_ranking.empty:
-            df_ranking.to_excel(writer, sheet_name="筛选排名", index=False)
-        if not df_detail.empty:
-            df_detail.to_excel(writer, sheet_name="信号详情", index=False)
+        df_ranking.to_excel(writer, sheet_name="筛选排名", index=False)
+        df_detail.to_excel(writer, sheet_name="信号详情", index=False)
