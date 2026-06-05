@@ -132,8 +132,14 @@ def get_pool_exchange_all(exchange: str) -> List[str]:
                 df = ak.stock_info_sh_name_code(symbol=sub)
                 codes.extend(str(c) for c in df["证券代码"].tolist())
         else:
-            df = ak.stock_info_sz_name_code(symbol="A股列表")
-            codes.extend(str(c) for c in df["A股代码"].tolist())
+            # 优先使用深交所官网，失败时切换到东方财富 API（不依赖 szse.cn）
+            try:
+                df = ak.stock_info_sz_name_code(symbol="A股列表")
+                codes.extend(str(c) for c in df["A股代码"].tolist())
+            except Exception:
+                click.echo("  szse.cn 连接失败，改用东方财富 API ...", err=True)
+                df = ak.stock_sz_a_spot_em()
+                codes.extend(str(c) for c in df["代码"].tolist())
 
         symbols = [_to_yfinance_symbol(c) for c in codes]
         if symbols:
