@@ -48,18 +48,27 @@ echo ""
 
 cd "${PROJECT_DIR}"
 
+SUCCESS=0
+FAIL=0
+
 # ===================== Step 1: 各大板块潜力股发现 ==============
 
 for POOL in "${POOLS[@]}"; do
     echo "📊 潜力股发现 (${POOL}, Top ${TOP_N}, >= ${MIN_SCORE}分)"
     echo "------------------------------------------------------------"
 
-    stock discover \
+    if stock discover \
         --pool "${POOL}" \
         --start "${START_DATE}" \
         --end "${END_DATE}" \
         --min-score "${MIN_SCORE}" \
-        --top "${TOP_N}"
+        --top "${TOP_N}"; then
+        echo "  [OK] ${POOL} 分析完成"
+        ((SUCCESS++)) || true
+    else
+        echo "  [FAIL] ${POOL} 分析失败"
+        ((FAIL++)) || true
+    fi
 
     echo ""
 done
@@ -70,10 +79,16 @@ if [ -f "${WATCHLIST}" ]; then
     echo "📋 自选股分析 (${WATCHLIST})"
     echo "------------------------------------------------------------"
 
-    stock screen \
+    if stock screen \
         --file "${WATCHLIST}" \
         --start "${START_DATE}" \
-        --end "${END_DATE}"
+        --end "${END_DATE}"; then
+        echo "  [OK] 自选股分析完成"
+        ((SUCCESS++)) || true
+    else
+        echo "  [FAIL] 自选股分析失败"
+        ((FAIL++)) || true
+    fi
 else
     echo "⚠️  跳过自选股分析 — 未找到 ${WATCHLIST}"
     echo "    创建方法: 每行一个代码，如 600519.SS"
@@ -104,5 +119,6 @@ fi
 echo ""
 echo "============================================================"
 echo "  所有分析完成!  $(date '+%H:%M:%S')"
+echo "  成功: ${SUCCESS} 项 | 失败: ${FAIL} 项"
 echo "  Excel 和图表在: ${OUTPUT_DIR}/"
 echo "============================================================"
