@@ -1,9 +1,10 @@
 #!/bin/bash
 # ============================================================
 #  股票数据缓存更新脚本
-#  用法: ./update_cache.sh [START_DATE]
+#  用法: ./update_cache.sh [START_DATE] [WORKERS]
 #  说明: 每天凌晨运行，增量更新 cyb/hgt/sgt 板块及自选股缓存
 #        START_DATE 默认 2025-01-01，可传入覆盖
+#        WORKERS    并发下载线程数，默认 8
 # ============================================================
 
 set -e
@@ -15,6 +16,7 @@ PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WATCHLIST="${PROJECT_DIR}/watchlist.txt"
 LOG_DIR="${PROJECT_DIR}/logs"
 START_DATE="${1:-2025-01-01}"
+WORKERS="${2:-8}"
 END_DATE=$(date +%Y-%m-%d)
 LOG_FILE="${LOG_DIR}/update_cache_${END_DATE}.log"
 
@@ -29,7 +31,7 @@ exec > >(tee -a "${LOG_FILE}") 2>&1
 
 echo "============================================================"
 echo "  缓存更新开始  $(date '+%Y-%m-%d %H:%M:%S')"
-echo "  范围: ${START_DATE} ~ ${END_DATE}"
+echo "  范围: ${START_DATE} ~ ${END_DATE} | 并发: ${WORKERS} 线程"
 echo "============================================================"
 echo ""
 
@@ -57,7 +59,7 @@ for pool in "${POOLS[@]}"; do
     echo "  更新板块缓存: ${pool}"
     echo "------------------------------------------------------------"
 
-    if stock update-cache --pool "${pool}" --start "${START_DATE}" --end "${END_DATE}"; then
+    if stock update-cache --pool "${pool}" --start "${START_DATE}" --end "${END_DATE}" --workers "${WORKERS}"; then
         echo "  [OK] ${pool} 缓存更新完成"
         ((SUCCESS++)) || true
     else
@@ -78,7 +80,7 @@ if [ -f "${WATCHLIST}" ]; then
     SYMBOLS=$(grep -v '^\s*#' "${WATCHLIST}" | grep -v '^\s*$' | tr '\n' ' ')
 
     if [ -n "${SYMBOLS}" ]; then
-        if stock update-cache ${SYMBOLS} --start "${START_DATE}" --end "${END_DATE}"; then
+        if stock update-cache ${SYMBOLS} --start "${START_DATE}" --end "${END_DATE}" --workers "${WORKERS}"; then
             echo "  [OK] 自选股缓存更新完成"
             ((SUCCESS++)) || true
         else

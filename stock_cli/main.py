@@ -377,18 +377,22 @@ def backtest(symbols, pool, start, end, random_n, no_chart):
 ]), default=None, help="预置股票池")
 @click.option("--start", default="2025-01-01", help="开始日期 (默认: 2025-01-01)")
 @click.option("--end", default=None, help="结束日期 (默认: 今天)")
-def update_cache(symbols, pool, start, end):
+@click.option("--workers", default=8, type=int, help="并发下载线程数 (默认: 8)")
+def update_cache(symbols, pool, start, end, workers):
     """手动更新股票或股票池的本地缓存。
 
     SYMBOLS: 一个或多个股票代码，如 600001.SS
-    
+
     示例:
       stock update-cache 600001.SS
       stock update-cache --pool cyb
+      stock update-cache --pool hgt --workers 16
     """
+    import threading
+    from concurrent.futures import ThreadPoolExecutor, as_completed
     from datetime import datetime
     from stock_cli.pool_provider import BUILTIN_POOLS, get_pool
-    
+
     if not end:
         end = datetime.now().strftime("%Y-%m-%d")
 
@@ -407,32 +411,48 @@ def update_cache(symbols, pool, start, end):
 
     # 去重
     unique_symbols = list(dict.fromkeys(all_symbols))
-    
-    click.echo(f"开始更新缓存: {pool_name} 共 {len(unique_symbols)} 只股票 ({start} ~ {end})")
-    
+    total = len(unique_symbols)
+
+    click.echo(f"开始更新缓存: {pool_name} 共 {total} 只股票 ({start} ~ {end})，并发 {workers} 线程")
+
     from stock_cli.cache import load_cache, save_cache
     from stock_cli.fetcher import _fetch_from_network
 
+    counter_lock = threading.Lock()
+    done_count = 0
     success_count = 0
-    for idx, symbol in enumerate(unique_symbols, 1):
-        click.echo(f"  [{idx}/{len(unique_symbols)}] 更新 {symbol} ...")
+
+    def fetch_one(symbol: str) -> tuple[str, bool, str]:
+        """返回 (symbol, success, message)"""
         try:
             cached = load_cache(symbol)
             fetch_start = start
             if not cached.empty:
                 cache_end = str(cached.index.max().date())
                 if cache_end >= end:
-                    click.echo(f"    已是最新 ({cache_end})，跳过")
-                    success_count += 1
-                    continue
-                fetch_start = cache_end  # 增量拉取
+                    return symbol, True, f"已是最新 ({cache_end})，跳过"
+                fetch_start = cache_end
             new_data = _fetch_from_network(symbol, fetch_start, end)
             save_cache(symbol, new_data)
-            success_count += 1
+            return symbol, True, f"OK ({len(new_data)} 条)"
         except Exception as e:
-            click.echo(f"    更新失败: {e}", err=True)
+            return symbol, False, str(e)
 
-    click.echo(f"\n缓存更新完成! 成功: {success_count}/{len(unique_symbols)}")
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = {executor.submit(fetch_one, s): s for s in unique_symbols}
+        for future in as_completed(futures):
+            symbol, ok, msg = future.result()
+            with counter_lock:
+                done_count += 1
+                if ok:
+                    success_count += 1
+                idx = done_count
+            if ok:
+                click.echo(f"  [{idx}/{total}] {symbol}: {msg}")
+            else:
+                click.echo(f"  [{idx}/{total}] {symbol}: 失败 - {msg}", err=True)
+
+    click.echo(f"\n缓存更新完成! 成功: {success_count}/{total}")
 
 
 if __name__ == "__main__":
