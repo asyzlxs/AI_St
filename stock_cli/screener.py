@@ -1,4 +1,5 @@
-import time
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Callable
 
@@ -141,28 +142,39 @@ def analyze_stock(symbol: str, df: pd.DataFrame, name: Optional[str] = None) -> 
     )
 
 
-def screen_stocks(symbols: List[str], start: str, end: str,
-                   on_progress: Optional[Callable] = None) -> List[ScreenResult]:
-    """批量筛选股票，按得分降序返回结果。"""
-    results: List[ScreenResult] = []
-    total = len(symbols)
+def _process_one(symbol: str, start: str, end: str) -> ScreenResult:
+    """获取并分析单只股票，供并发调用。"""
+    try:
+        name = fetch_stock_name(symbol)
+        df = fetch_stock_data(symbol, start, end)
+        return analyze_stock(symbol, df, name)
+    except Exception as e:
+        return ScreenResult(
+            symbol=symbol, total_score=0, max_possible=MAX_POSSIBLE,
+            signals=[], error=str(e),
+        )
 
-    for idx, symbol in enumerate(symbols, 1):
-        if on_progress:
-            on_progress(idx, total, symbol)
-        try:
-            # 获取股票名称和数据
-            name = fetch_stock_name(symbol)
-            df = fetch_stock_data(symbol, start, end)
-            result = analyze_stock(symbol, df, name)
-        except Exception as e:
-            result = ScreenResult(
-                symbol=symbol, total_score=0, max_possible=MAX_POSSIBLE,
-                signals=[], error=str(e),
-            )
-        results.append(result)
-        if idx < total:
-            time.sleep(0.3)
+
+def screen_stocks(symbols: List[str], start: str, end: str,
+                   on_progress: Optional[Callable] = None,
+                   max_workers: int = 8) -> List[ScreenResult]:
+    """批量筛选股票，按得分降序返回结果（并发执行）。"""
+    total = len(symbols)
+    results: List[Optional[ScreenResult]] = [None] * total
+    progress_lock = threading.Lock()
+    counter = [0]
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(_process_one, s, start, end): i
+                   for i, s in enumerate(symbols)}
+        for future in as_completed(futures):
+            idx = futures[future]
+            results[idx] = future.result()
+            if on_progress:
+                with progress_lock:
+                    counter[0] += 1
+                    done = counter[0]
+                on_progress(done, total, symbols[idx])
 
     results.sort(key=lambda r: r.total_score, reverse=True)
     return results
