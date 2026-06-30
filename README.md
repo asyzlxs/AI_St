@@ -154,12 +154,17 @@ output/
 |------|------|------|
 | 金叉 (MA5 x MA20) | 15 | 短期均线上穿中期均线，趋势启动 |
 | 多头排列 | 10 | Close > MA5 > MA20 > MA60，上升趋势确认 |
-| RSI 超卖反弹 | 15 | RSI 从 30 以下回升，均值回归信号 |
+| RSI 超卖反弹 | 10 | RSI 从 30 以下回升，均值回归信号 |
 | MACD 柱转正 | 10 | MACD 柱状图从负转正，动量转多 |
 | MACD 底背离 | 20 | 价格新低但 MACD 未新低，最强反转信号 |
 | 放量突破 | 10 | 当日成交量超过 20 日均量 2 倍 |
 | 60 日新高 | 10 | 收盘价创近 60 个交易日新高 |
 | 波动率突破 | 10 | ATR 收缩后放大，蓄力突破 |
+| 相对强度 (RS) | 20 | 个股 20 日涨幅跑赢沪深 300，强势股筛选 |
+| 行业动量 | 15 | 同行业股票 20 日均涨幅为正，板块共振 |
+| 资金流 (CMF) | 15 | 成交量加权资金净流入（CMF > 0.05） |
+
+> 满分 **130 分**（原 100 分），多信号叠加覆盖趋势、动量、资金三个维度。
 
 ### 基本用法
 
@@ -525,11 +530,15 @@ stock_cli/
   fetcher.py           # 数据获取 (yfinance)
   plotter.py           # 图表绘制 (收盘价图 + 技术分析三子图)
   exporter.py          # Excel 导出
-  indicators.py        # 技术指标计算 (MA/RSI/MACD/ATR等)
-  screener.py          # 评分系统 + 批量筛选
+  indicators.py        # 技术指标计算 (MA/RSI/MACD/ATR/RS/CMF/行业动量)
+  screener.py          # 评分系统 + 批量筛选 (含基准和行业数据)
   screen_formatter.py  # 终端表格 + 筛选结果Excel导出
   pool_provider.py     # 股票池获取 (akshare + 静态fallback)
-  data/                # 静态股票池文件 (sz50/hs300/cyb)
+  sector_cache.py      # 行业查询本地缓存
+  data/                # 静态股票池文件 + sector_map.json
+backtest_score/
+  backtest_score.py    # 历史得分回测 (multiprocessing + RS/行业动量支持)
+  score_history.py     # 逐日历史评分计算
 output/                # 所有输出文件 (图表/Excel)
 ```
 

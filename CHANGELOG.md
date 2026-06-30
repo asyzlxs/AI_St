@@ -1,5 +1,69 @@
 # 更新日志
 
+## 2026-06-30 - 新信号版回测 + 评分体系升级
+
+### 新增功能
+
+#### 1. 三个新技术信号
+
+| 信号 | 分值 | 含义 |
+|------|------|------|
+| 相对强度(RS) | 20 | 个股20日涨幅跑赢沪深300，趋势强势 |
+| 行业动量 | 15 | 同行业股票20日均涨幅为正，板块共振 |
+| 资金流(CMF) | 15 | 成交量加权的资金净流入（CMF > 0.05） |
+
+满分从原 100 分扩展至 **130 分**（多信号叠加更可靠）。
+
+#### 2. 回测引擎升级（backtest_score）
+
+- **benchmark 支持**：自动加载沪深300历史数据，RS 信号在历史回测中正确计算
+- **行业动量支持**：主进程预算行业动量 Series 后通过 multiprocessing initializer 注入子进程，避免重复计算
+- **真正多核并发**：从 ThreadPoolExecutor 迁移到 `multiprocessing.Pool`，绕过 GIL，大池子回测速度显著提升
+- **分档优化**：默认分档改为 20/30/40/50/60/70（每10分一档），覆盖新满分范围
+- **`--no-industry` 选项**：可跳过行业动量预算，加快纯信号回测
+
+#### 3. 行业缓存（sector_cache）
+
+新增 `stock_cli/sector_cache.py`，对 akshare 行业查询结果进行本地缓存（`stock_cli/data/sector_map.json`），避免每次回测重复网络请求。
+
+#### 4. my_daily_analysis.sh 增加沪深300
+
+默认分析池从 `cyb hgt sgt` 扩展为 `cyb hgt sgt hs300`。
+
+### 技术改进
+
+#### indicators.py
+- 新增 `compute_rs()` / `detect_rs_outperform()` - 相对强度计算
+- 新增 `compute_industry_momentum()` / `detect_industry_momentum()` - 行业动量
+- 新增 `compute_cmf()` / `detect_cmf_inflow()` - 蔡金资金流量
+
+#### screener.py
+- `analyze_stock()` 新增 `benchmark`、`sector_dfs`、`precomputed_industry_mom` 参数
+- 回测路径直接传预算的行业动量值（`precomputed_industry_mom`），跳过 sector_dfs 遍历
+- `screen_stocks()` 自动加载基准和行业数据后传给每只股票的分析
+
+#### score_history.py
+- `compute_score_history()` 新增 `benchmark` 和 `industry_mom_series` 参数
+- 行业动量逐日查表（O(1)），不再每天重新遍历 sector_dfs
+
+### 使用示例
+
+```bash
+# 带新信号的回测（自动加载基准和行业数据）
+python backtest_score/backtest_score.py --pool hgt --start 2024-01-01
+
+# 跳过行业动量，快速回测
+python backtest_score/backtest_score.py --pool cyb --no-industry
+
+# 带新信号的实时筛选
+stock discover --pool hgt --start 2025-07-01 --end 2026-06-30
+
+# 每日全面分析（含沪深300）
+./my_daily_analysis.sh
+```
+
+---
+
 ## 2026-04-13 - 新增多板块支持
 
 ### 🎉 新增功能

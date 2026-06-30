@@ -1,5 +1,7 @@
-import pandas as pd
+from typing import Dict, List, Optional
+
 import numpy as np
+import pandas as pd
 
 
 def moving_averages(df: pd.DataFrame) -> pd.DataFrame:
@@ -164,3 +166,121 @@ def detect_atr_squeeze_breakout(atr: pd.Series,
     squeeze = min_atr < avg_atr * 0.75
     expansion = current_atr > min_atr * expansion_threshold
     return squeeze and expansion
+
+
+# ── 新增信号 ──────────────────────────────────────────────────────────────────
+
+def compute_rs(df: pd.DataFrame, benchmark: pd.Series, period: int = 20) -> float:
+    """
+    计算相对强度 RS = 个股 period 日涨幅 - 基准同期涨幅（差值法，单位百分点）。
+
+    用差值而非比值，避免基准涨幅接近 0 时分母爆炸。
+    RS > 0 表示跑赢大盘，RS > 5 表示跑赢 5 个百分点。
+    benchmark: 与 df.index 对齐的基准收盘价 Series（如沪深300）。
+    返回 RS 值，无法计算时返回 0.0（中性）。
+    """
+    close = df["Close"].dropna()
+    if len(close) < period + 1:
+        return 0.0
+
+    common = close.index.intersection(benchmark.index)
+    if len(common) < period + 1:
+        return 0.0
+
+    stock_close = close.loc[common]
+    bench_close = benchmark.loc[common]
+
+    stock_ret = float(stock_close.iloc[-1] / stock_close.iloc[-period - 1] - 1) * 100
+    bench_ret = float(bench_close.iloc[-1] / bench_close.iloc[-period - 1] - 1) * 100
+
+    return stock_ret - bench_ret
+
+
+def detect_rs_outperform(df: pd.DataFrame, benchmark: pd.Series,
+                          period: int = 20, threshold: float = 5.0) -> bool:
+    """
+    检测个股相对强度是否跑赢大盘。
+    RS > threshold 百分点（默认跑赢 5 个百分点）时触发。
+    """
+    rs = compute_rs(df, benchmark, period)
+    return rs > threshold
+
+
+def compute_industry_momentum(
+    symbol: str,
+    sector: str,
+    sector_dfs: Dict[str, pd.DataFrame],
+    period: int = 20,
+) -> float:
+    """
+    计算行业动量：同 sector 内所有股票（排除自身）近 period 日平均涨幅。
+
+    sector_dfs: {symbol: df} 的字典，只传同 sector 的股票。
+    返回行业平均涨幅（小数，如 0.05 表示 5%），无法计算时返回 0.0。
+    """
+    returns = []
+    for sym, df in sector_dfs.items():
+        if sym == symbol:
+            continue
+        close = df["Close"].dropna()
+        if len(close) < period + 1:
+            continue
+        ret = float(close.iloc[-1] / close.iloc[-period - 1] - 1)
+        returns.append(ret)
+
+    if not returns:
+        return 0.0
+    return sum(returns) / len(returns)
+
+
+def detect_industry_momentum(
+    symbol: str,
+    sector: str,
+    sector_dfs: Dict[str, pd.DataFrame],
+    period: int = 20,
+    threshold: float = 0.0,
+) -> bool:
+    """
+    行业动量触发：同行业近 period 日平均涨幅 > threshold（默认 >0，即行业整体上涨）。
+    """
+    momentum = compute_industry_momentum(symbol, sector, sector_dfs, period)
+    return momentum > threshold
+
+
+def compute_cmf(df: pd.DataFrame, period: int = 20) -> float:
+    """
+    计算 Chaikin Money Flow（CMF）。
+
+    CMF = sum(MFV, period) / sum(Volume, period)
+    MFV = ((Close - Low) - (High - Close)) / (High - Low) * Volume
+
+    返回值范围 [-1, +1]，>0 表示资金净流入，无法计算时返回 0.0。
+    """
+    if len(df) < period:
+        return 0.0
+
+    high = df["High"]
+    low = df["Low"]
+    close = df["Close"]
+    volume = df["Volume"]
+
+    hl_range = (high - low).replace(0, np.nan)
+    mfm = ((close - low) - (high - close)) / hl_range  # Money Flow Multiplier
+    mfv = mfm * volume                                  # Money Flow Volume
+
+    window_mfv = mfv.iloc[-period:].sum()
+    window_vol = volume.iloc[-period:].sum()
+
+    if window_vol == 0:
+        return 0.0
+    return float(window_mfv / window_vol)
+
+
+def detect_cmf_inflow(df: pd.DataFrame, period: int = 20,
+                       threshold: float = 0.05) -> bool:
+    """
+    检测资金持续流入：CMF > threshold（默认 0.05）。
+    CMF > 0.1 强流入，> 0.05 温和流入。
+    """
+    cmf = compute_cmf(df, period)
+    return cmf > threshold

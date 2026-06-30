@@ -24,7 +24,7 @@ END_DATE="${1:-$(date -v-1d +%Y-%m-%d 2>/dev/null || date -d "yesterday" +%Y-%m-
 START_DATE=$(date -v-1y +%Y-%m-%d 2>/dev/null || date -d "1 year ago" +%Y-%m-%d)
 
 # discover 参数
-POOLS=("cyb" "hgt" "sgt")
+POOLS=("cyb" "hgt" "sgt" "hs300")
 MIN_SCORE=15          # 最低分数阈值
 TOP_N=20              # 显示前 N 名
 
