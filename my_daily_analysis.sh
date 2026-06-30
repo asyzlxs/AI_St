@@ -10,7 +10,7 @@ set -e
 # ===================== 配置区 (按需修改) =====================
 
 # conda 环境名
-CONDA_ENV="stock_cli"
+CONDA_ENV="stock_cli_v1"
 
 # 项目目录
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
